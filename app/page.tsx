@@ -52,29 +52,50 @@ async function generatePdfFromHtmlString(html: string, filename = "document.pdf"
     const html2pdf = await loadHtml2Pdf();
 
     const parsed = new DOMParser().parseFromString(html, "text/html");
-    const styles = Array.from(parsed.querySelectorAll("style"))
+
+    // Collect styles and rewrite body/html selectors so they apply inside #pdf-root
+    let styles = Array.from(parsed.querySelectorAll("style"))
       .map((s) => s.innerHTML)
       .join("\n");
 
+    // Basic selector rewrite for mobile reliability
+    styles = styles
+      .replaceAll("html, body", "#pdf-root")
+      .replaceAll("body, html", "#pdf-root")
+      .replaceAll("body {", "#pdf-root {")
+      .replaceAll("html {", "#pdf-root {");
+
+    // Create container INSIDE viewport but invisible (don't move offscreen)
     const container = document.createElement("div");
     container.style.position = "fixed";
-    container.style.left = "-9999px";
+    container.style.left = "0";
     container.style.top = "0";
-    container.style.width = "794px"; // approx A4 width at 96dpi
+    container.style.width = "210mm";
+    container.style.minHeight = "297mm";
     container.style.background = "#ffffff";
+    container.style.opacity = "0.01";          // invisible but still rendered
+    container.style.pointerEvents = "none";
+    container.style.zIndex = "-1";
+    container.style.overflow = "hidden";
 
     container.innerHTML = `
       <style>${styles}</style>
-      ${parsed.body.innerHTML}
+      <div id="pdf-root">
+        ${parsed.body.innerHTML}
+      </div>
     `;
 
     document.body.appendChild(container);
 
-    // Let layout settle
-    await new Promise((r) => setTimeout(r, 200));
+    // Wait for layout + fonts
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise((r) => setTimeout(r, 300));
+
+    // VERY IMPORTANT: capture the #pdf-root, not the outer container
+    const target = container.querySelector("#pdf-root") as HTMLElement;
 
     await html2pdf()
-      .from(container)
+      .from(target)
       .set({
         margin: 10,
         filename,
@@ -87,6 +108,8 @@ async function generatePdfFromHtmlString(html: string, filename = "document.pdf"
     document.body.removeChild(container);
   } catch (err) {
     console.error("PDF generation failed, falling back to print:", err);
+
+    // fallback: open print window (user can Save as PDF)
     const w = window.open("");
     if (w) {
       w.document.write(html);
@@ -97,6 +120,7 @@ async function generatePdfFromHtmlString(html: string, filename = "document.pdf"
     }
   }
 }
+
 
 /* =========================
    HTML Generators (with your ORIGINAL calc)
