@@ -26,31 +26,67 @@ async function loadHtml2Pdf() {
   });
 }
 
+/**
+ * Generate PDF from a full HTML string by writing it into a hidden iframe (so <head> styles apply),
+ * then running html2pdf on the iframe document.body. This avoids blank PDFs caused by passing a full
+ * document string into a detached container.
+ */
 async function generatePdfFromHtmlString(html: string, filename = "document.pdf") {
   try {
     const html2pdf = await loadHtml2Pdf();
-    // Create a container element that's not visible
-    const container = document.createElement("div");
-    container.style.position = "fixed";
-    container.style.left = "-9999px";
-    container.style.top = "0";
-    container.innerHTML = html;
-    document.body.appendChild(container);
 
-    // html2pdf usage
+    // Create hidden iframe and write the supplied HTML into it using srcdoc.
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.left = "-9999px";
+    iframe.style.top = "0";
+    // Give the iframe page a close size matching A4 — helps html2canvas layout.
+    iframe.style.width = "210mm";
+    iframe.style.height = "297mm";
+    // Use srcdoc to write the full HTML document
+    iframe.srcdoc = html;
+
+    document.body.appendChild(iframe);
+
+    // Wait for the iframe to load (styles and fonts ready)
+    await new Promise<void>((resolve, reject) => {
+      const onLoad = () => {
+        // small timeout so fonts/CSS can settle (optional but helps)
+        setTimeout(() => resolve(), 250);
+      };
+      const onError = () => reject(new Error("Iframe failed to load PDF content"));
+      iframe.addEventListener("load", onLoad, { once: true });
+      iframe.addEventListener("error", onError, { once: true });
+
+      // Safety timeout
+      setTimeout(() => {
+        // If iframe hasn't loaded in 8s, continue anyway (avoid forever waiting).
+        resolve();
+      }, 8000);
+    });
+
+    // Access the body of the iframe and run html2pdf on it
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
+      document.body.removeChild(iframe);
+      throw new Error("Could not access iframe document");
+    }
+    const element = doc.body;
+
+    // Use html2pdf to save the iframe body as PDF
     await html2pdf()
-      .from(container)
+      .from(element)
       .set({
-        margin:       10,
+        margin: 10,
         filename,
-        image:        { type: "jpeg", quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: "pt", format: "a4", orientation: "portrait" }
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
       })
       .save();
 
     // cleanup
-    document.body.removeChild(container);
+    if (document.body.contains(iframe)) document.body.removeChild(iframe);
   } catch (err) {
     console.error("PDF generation failed, falling back to print:", err);
     // fallback: open print window (user can Save as PDF)
