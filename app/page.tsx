@@ -25,15 +25,20 @@ async function loadHtml2Pdf() {
   if ((window as any).html2pdf) return (window as any).html2pdf;
 
   return new Promise<any>((resolve, reject) => {
-    const existing = document.querySelector('script[data-html2pdf="1"]') as HTMLScriptElement | null;
+    const existing = document.querySelector(
+      'script[data-html2pdf="1"]'
+    ) as HTMLScriptElement | null;
     if (existing) {
       existing.addEventListener("load", () => resolve((window as any).html2pdf));
-      existing.addEventListener("error", () => reject(new Error("Failed to load html2pdf")));
+      existing.addEventListener("error", () =>
+        reject(new Error("Failed to load html2pdf"))
+      );
       return;
     }
 
     const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js";
+    s.src =
+      "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js";
     s.async = true;
     s.setAttribute("data-html2pdf", "1");
     s.onload = () => resolve((window as any).html2pdf);
@@ -73,7 +78,7 @@ async function generatePdfFromHtmlString(html: string, filename = "document.pdf"
     container.style.width = "210mm";
     container.style.minHeight = "297mm";
     container.style.background = "#ffffff";
-    container.style.opacity = "0.01";          // invisible but still rendered
+    container.style.opacity = "0.01"; // invisible but still rendered
     container.style.pointerEvents = "none";
     container.style.zIndex = "-1";
     container.style.overflow = "hidden";
@@ -120,7 +125,6 @@ async function generatePdfFromHtmlString(html: string, filename = "document.pdf"
     }
   }
 }
-
 
 /* =========================
    HTML Generators (with your ORIGINAL calc)
@@ -286,6 +290,9 @@ function generateUnloaderHTML(d: any) {
   <div class="row"><span class="label">Bharti:</span> ${escapeHtml(d.bharti || "")}</div>
   <div class="row"><span class="label">Vehicle No:</span> ${escapeHtml(d.vehicleNo || "")}</div>
 
+  <div class="row"><span class="label">Unloading Place:</span> ${escapeHtml(d.unloadingPlace || "")}</div>
+  <div class="row"><span class="label">Stacks:</span> ${escapeHtml(d.stacks || "")}</div>
+
   <div class="kaata">Kaata Weight: ${escapeHtml(d.kaataWeight || "")} kg</div>
 
   <h3>Remark</h3>
@@ -300,7 +307,9 @@ function generateUnloaderHTML(d: any) {
 ========================= */
 
 export default function Page() {
-  const [mode, setMode] = useState<"home" | "purchaser" | "unloader">("home");
+  const [mode, setMode] = useState<"home" | "purchaser" | "unloader">(
+    "home"
+  );
   const [data, setData] = useState<any>({
     advancePayment: false,
     advancePaymentMode: "",
@@ -308,9 +317,16 @@ export default function Page() {
     amountOnHold: "",
     purchaserRemark: "",
     unloaderRemark: "",
+    unloadingPlace: "",
+    stacks: "",
   });
 
-  const input = (label: string, key: string, type: string = "text", placeholder?: string) => (
+  const input = (
+    label: string,
+    key: string,
+    type: string = "text",
+    placeholder?: string
+  ) => (
     <div style={{ marginBottom: 10 }}>
       <div style={{ fontWeight: 600, marginBottom: 6 }}>{label}</div>
       <input
@@ -330,7 +346,13 @@ export default function Page() {
         placeholder={placeholder || label}
         onChange={(e) => setData({ ...data, [key]: e.target.value })}
         value={data[key] || ""}
-        style={{ display: "block", padding: 10, width: "100%", minHeight: 90, fontSize: 16 }}
+        style={{
+          display: "block",
+          padding: 10,
+          width: "100%",
+          minHeight: 90,
+          fontSize: 16,
+        }}
       />
     </div>
   );
@@ -357,7 +379,10 @@ export default function Page() {
         >
           Purchaser
         </button>
-        <button onClick={() => setMode("unloader")} style={{ width: "100%", padding: 14, fontSize: 18 }}>
+        <button
+          onClick={() => setMode("unloader")}
+          style={{ width: "100%", padding: 14, fontSize: 18 }}
+        >
           Unloader
         </button>
       </div>
@@ -402,7 +427,10 @@ export default function Page() {
             <button
               onClick={async () => {
                 const html = generateOfficeHTML(data);
-                await generatePdfFromHtmlString(html, `office_${data.date || "report"}.pdf`);
+                await generatePdfFromHtmlString(
+                  html,
+                  `office_${data.date || "report"}.pdf`
+                );
               }}
               style={{ padding: 14, fontSize: 16, marginRight: 10 }}
             >
@@ -412,7 +440,10 @@ export default function Page() {
             <button
               onClick={async () => {
                 const html = generateUnloaderFromPurchaserHTML(data);
-                await generatePdfFromHtmlString(html, `unloader_${data.date || "report"}.pdf`);
+                await generatePdfFromHtmlString(
+                  html,
+                  `unloader_${data.date || "report"}.pdf`
+                );
               }}
               style={{ padding: 14, fontSize: 16 }}
             >
@@ -434,6 +465,10 @@ export default function Page() {
           {input("Bags (decimals allowed)", "bags", "number")}
           {input("Bharti (info only)", "bharti", "number")}
           {input("Vehicle No", "vehicleNo")}
+
+          {input("Unloading Place", "unloadingPlace")}
+          {input("Stacks (can be empty)", "stacks")}
+
           {input("Kaata Weight (kg)", "kaataWeight", "number")}
 
           {textarea("Remark (Unloader)", "unloaderRemark")}
@@ -442,7 +477,10 @@ export default function Page() {
             <button
               onClick={async () => {
                 const html = generateUnloaderHTML(data);
-                await generatePdfFromHtmlString(html, `unloader_slip_${data.date || "report"}.pdf`);
+                await generatePdfFromHtmlString(
+                  html,
+                  `unloader_slip_${data.date || "report"}.pdf`
+                );
               }}
               style={{ padding: 14, fontSize: 16 }}
             >
