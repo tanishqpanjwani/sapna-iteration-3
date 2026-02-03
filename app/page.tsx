@@ -29,7 +29,9 @@ async function loadHtml2Pdf() {
       'script[data-html2pdf="1"]'
     ) as HTMLScriptElement | null;
     if (existing) {
-      existing.addEventListener("load", () => resolve((window as any).html2pdf));
+      existing.addEventListener("load", () =>
+        resolve((window as any).html2pdf)
+      );
       existing.addEventListener("error", () =>
         reject(new Error("Failed to load html2pdf"))
       );
@@ -96,7 +98,7 @@ async function generatePdfFromHtmlString(html: string, filename = "document.pdf"
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     await new Promise((r) => setTimeout(r, 300));
 
-    // VERY IMPORTANT: capture the #pdf-root, not the outer container
+    // Capture #pdf-root, not outer container
     const target = container.querySelector("#pdf-root") as HTMLElement;
 
     await html2pdf()
@@ -114,7 +116,6 @@ async function generatePdfFromHtmlString(html: string, filename = "document.pdf"
   } catch (err) {
     console.error("PDF generation failed, falling back to print:", err);
 
-    // fallback: open print window (user can Save as PDF)
     const w = window.open("");
     if (w) {
       w.document.write(html);
@@ -127,13 +128,15 @@ async function generatePdfFromHtmlString(html: string, filename = "document.pdf"
 }
 
 /* =========================
-   HTML Generators (with your ORIGINAL calc)
+   HTML Generators (UPDATED: hammali is deducted)
    - 1 bag = 50kg
    - quantity (qtl) = bags / 2
-   - rough cost = qtl * rate
-   - total rough cost = rough + (qtl * hammali)
-   - show estimate without hold = total rough cost
-   - show estimate after hold = total rough cost - amountOnHold
+   - rough crop value = qtl * rate
+   - hammali deduction = qtl * hammali
+   - farmer amount (after hammali) = rough crop value - hammali deduction
+   - estimate without hold = farmer amount
+   - estimate after hold = farmer amount - amountOnHold
+   - balance after advance = estimate after hold - advanceAmount
 ========================= */
 
 function generateOfficeHTML(d: any) {
@@ -144,8 +147,14 @@ function generateOfficeHTML(d: any) {
   const advanceAmountNum = toNumber(d.advanceAmount);
 
   const quantityQtl = bagsNum / 2;
+
   const roughCropCost = quantityQtl * rateNum;
-  const totalRoughCost = roughCropCost + quantityQtl * hammaliNum;
+
+  // ✅ hammali is a deduction
+  const hammaliDeduction = quantityQtl * hammaliNum;
+
+  // ✅ farmer amount after hammali deduction
+  const totalRoughCost = roughCropCost - hammaliDeduction;
 
   const estimateWithoutHold = totalRoughCost;
   const estimateAfterHold = totalRoughCost - amountOnHoldNum;
@@ -199,12 +208,13 @@ function generateOfficeHTML(d: any) {
   <hr/>
 
   <div class="row"><span class="label">Kisan Bank Name:</span> ${escapeHtml(d.kisanBankName || "")}</div>
-  <div class="row"><span class="label">Hammali / per qtl:</span> ₹${hammaliNum.toFixed(2)}</div>
+  <div class="row"><span class="label">Hammali / per qtl (Deduction):</span> ₹${hammaliNum.toFixed(2)}</div>
 
   <div class="calc">
     <div class="row"><span class="label">Quantity (qtl):</span> <span class="highlight">${quantityQtl.toFixed(2)}</span></div>
-    <div class="row"><span class="label">Rough Crop Cost:</span> <span class="highlight">₹${roughCropCost.toFixed(2)}</span></div>
-    <div class="row"><span class="label">Total Rough Cost (with Hammali):</span> <span class="highlight">₹${totalRoughCost.toFixed(2)}</span></div>
+    <div class="row"><span class="label">Rough Crop Value:</span> <span class="highlight">₹${roughCropCost.toFixed(2)}</span></div>
+    <div class="row"><span class="label">Hammali Deduction:</span> <span class="highlight">₹${hammaliDeduction.toFixed(2)}</span></div>
+    <div class="row"><span class="label">Farmer Amount (after Hammali):</span> <span class="highlight">₹${totalRoughCost.toFixed(2)}</span></div>
 
     <hr/>
 
@@ -290,9 +300,6 @@ function generateUnloaderHTML(d: any) {
   <div class="row"><span class="label">Bharti:</span> ${escapeHtml(d.bharti || "")}</div>
   <div class="row"><span class="label">Vehicle No:</span> ${escapeHtml(d.vehicleNo || "")}</div>
 
-  <div class="row"><span class="label">Unloading Place:</span> ${escapeHtml(d.unloadingPlace || "")}</div>
-  <div class="row"><span class="label">Stacks:</span> ${escapeHtml(d.stacks || "")}</div>
-
   <div class="kaata">Kaata Weight: ${escapeHtml(d.kaataWeight || "")} kg</div>
 
   <h3>Remark</h3>
@@ -307,9 +314,7 @@ function generateUnloaderHTML(d: any) {
 ========================= */
 
 export default function Page() {
-  const [mode, setMode] = useState<"home" | "purchaser" | "unloader">(
-    "home"
-  );
+  const [mode, setMode] = useState<"home" | "purchaser" | "unloader">("home");
   const [data, setData] = useState<any>({
     advancePayment: false,
     advancePaymentMode: "",
@@ -317,8 +322,6 @@ export default function Page() {
     amountOnHold: "",
     purchaserRemark: "",
     unloaderRemark: "",
-    unloadingPlace: "",
-    stacks: "",
   });
 
   const input = (
@@ -421,7 +424,7 @@ export default function Page() {
           {input("Rate / per qtl", "rate", "number")}
           {input("Vehicle No", "vehicleNo")}
           {input("Kisan Bank Name", "kisanBankName")}
-          {input("Hammali / per qtl", "hammali", "number")}
+          {input("Hammali / per qtl (Deduction)", "hammali", "number")}
 
           <div style={{ marginTop: 14 }}>
             <button
@@ -465,10 +468,6 @@ export default function Page() {
           {input("Bags (decimals allowed)", "bags", "number")}
           {input("Bharti (info only)", "bharti", "number")}
           {input("Vehicle No", "vehicleNo")}
-
-          {input("Unloading Place", "unloadingPlace")}
-          {input("Stacks (can be empty)", "stacks")}
-
           {input("Kaata Weight (kg)", "kaataWeight", "number")}
 
           {textarea("Remark (Unloader)", "unloaderRemark")}
